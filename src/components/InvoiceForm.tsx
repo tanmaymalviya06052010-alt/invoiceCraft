@@ -509,8 +509,8 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
           <div className="space-y-4">
             {invoice.items.map((item, index) => (
               <div key={item.id} className="p-4 bg-gray-50 rounded-lg">
-                <div className="grid sm:grid-cols-12 gap-4 items-start">
-                  <div className="sm:col-span-6">
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1 min-w-0">
                     <label className="label">Description</label>
                     <input
                       type="text"
@@ -521,7 +521,7 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
                       maxLength={500}
                     />
                   </div>
-                  <div className="sm:col-span-2">
+                  <div className="w-20 flex-shrink-0">
                     <label className="label">Qty</label>
                     <input
                       type="number"
@@ -532,7 +532,7 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
                       max="10000"
                     />
                   </div>
-                  <div className="sm:col-span-2">
+                  <div className="w-28 flex-shrink-0">
                     <label className="label">Rate ($)</label>
                     <input
                       type="number"
@@ -544,9 +544,9 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
                       step="0.01"
                     />
                   </div>
-                  <div className="sm:col-span-2">
+                  <div className="w-28 flex-shrink-0">
                     <label className="label">Amount</label>
-                    <div className="input-field bg-gray-100 font-medium">
+                    <div className="input-field bg-gray-100 font-medium text-right truncate">
                       ${item.amount.toFixed(2)}
                     </div>
                   </div>
@@ -567,12 +567,12 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
 
         {/* Tax & Notes */}
         <div className="card">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
+          <div className="flex justify-between items-start gap-8">
+            <div className="flex-1">
               <label className="label">Tax Rate (%)</label>
               <input
                 type="number"
-                className="input-field"
+                className="input-field max-w-[120px]"
                 value={invoice.taxRate}
                 onChange={(e) => {
                   const rate = sanitizeNumber(parseFloat(e.target.value) || 0, 0, 100)
@@ -589,17 +589,23 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
                 step="0.5"
               />
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-600 mb-1">Subtotal</div>
-              <div className="text-lg font-medium">${invoice.subtotal.toFixed(2)}</div>
+            <div className="text-right min-w-[180px]">
+              <div className="flex justify-between text-sm text-gray-600 mb-1">
+                <span>Subtotal</span>
+                <span className="font-medium">${invoice.subtotal.toFixed(2)}</span>
+              </div>
               {invoice.taxRate > 0 && (
-                <>
-                  <div className="text-sm text-gray-600 mt-2">Tax ({invoice.taxRate}%)</div>
-                  <div className="text-lg font-medium">${invoice.taxAmount.toFixed(2)}</div>
-                </>
+                <div className="flex justify-between text-sm text-gray-600 mb-1">
+                  <span>Tax ({invoice.taxRate}%)</span>
+                  <span className="font-medium">${invoice.taxAmount.toFixed(2)}</span>
+                </div>
               )}
-              <div className="text-sm text-gray-600 mt-2">Total</div>
-              <div className="text-2xl font-bold text-primary-600">${invoice.total.toFixed(2)}</div>
+              <div className="border-t border-gray-200 mt-2 pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-gray-900">Total</span>
+                  <span className="text-2xl font-bold text-primary-600">${invoice.total.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
           </div>
           <div className="mt-4">

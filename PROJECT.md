@@ -32,6 +32,10 @@ invoicecraft/
 5. LocalStorage persistence
 6. Input sanitization & validation
 7. Error boundary component
+8. 20+ currency support
+9. Custom logo upload (max 2MB)
+10. Brand color picker
+11. 4 invoice templates (Professional, Modern, Minimal, Creative)
 
 ## Security Implemented
 - Content Security Policy (CSP) headers
@@ -58,3 +62,5 @@ None required for current MVP.
 - [ ] Stripe payments (Pro tier)
 - [ ] Custom domain
 - [ ] Product Hunt launch
+- [ ] Client management feature
+- [ ] Recurring invoices

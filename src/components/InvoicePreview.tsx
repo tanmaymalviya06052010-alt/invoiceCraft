@@ -9,6 +9,7 @@ interface InvoicePreviewProps {
 
 export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
   const brandColor = invoice.brandColor || '#3b82f6'
+  const currencySymbol = invoice.currencySymbol || '$'
   
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
@@ -18,9 +19,18 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
         style={{ backgroundColor: brandColor }}
       >
         <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold">INVOICE</h1>
-            <p className="text-white/80 mt-1">{invoice.invoiceNumber}</p>
+          <div className="flex items-center gap-4">
+            {invoice.logo && (
+              <img 
+                src={invoice.logo} 
+                alt="Logo" 
+                className="h-12 w-auto object-contain bg-white/10 rounded p-1"
+              />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold">INVOICE</h1>
+              <p className="text-white/80 mt-1">{invoice.invoiceNumber}</p>
+            </div>
           </div>
           <div className="text-right">
             <div className="text-white/80 text-sm">Status</div>
@@ -90,8 +100,8 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                 <tr key={item.id} className="border-b border-gray-100">
                   <td className="py-3 text-gray-900">{item.description || '-'}</td>
                   <td className="py-3 text-center text-gray-600">{item.quantity}</td>
-                  <td className="py-3 text-right text-gray-600">${item.rate.toFixed(2)}</td>
-                  <td className="py-3 text-right font-medium text-gray-900">${item.amount.toFixed(2)}</td>
+                  <td className="py-3 text-right text-gray-600">{currencySymbol}{item.rate.toFixed(2)}</td>
+                  <td className="py-3 text-right font-medium text-gray-900">{currencySymbol}{item.amount.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -103,18 +113,18 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
           <div className="w-64 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium">${invoice.subtotal.toFixed(2)}</span>
+              <span className="font-medium">{currencySymbol}{invoice.subtotal.toFixed(2)}</span>
             </div>
             {invoice.taxRate > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Tax ({invoice.taxRate}%)</span>
-                <span className="font-medium">${invoice.taxAmount.toFixed(2)}</span>
+                <span className="font-medium">{currencySymbol}{invoice.taxAmount.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t border-gray-200">
               <span className="font-semibold text-gray-900">Total</span>
               <span className="text-xl font-bold" style={{ color: brandColor }}>
-                ${invoice.total.toFixed(2)}
+                {currencySymbol}{invoice.total.toFixed(2)}
               </span>
             </div>
           </div>

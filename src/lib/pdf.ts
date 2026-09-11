@@ -27,6 +27,16 @@ const validateInvoice = (invoice: Invoice): boolean => {
   )
 }
 
+/**
+ * Convert hex color to RGB
+ */
+const hexToRgb = (hex: string): [number, number, number] => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result
+    ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+    : [59, 130, 246] // Default blue
+}
+
 export const generatePDF = (invoice: Invoice): jsPDF => {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -39,25 +49,41 @@ export const generatePDF = (invoice: Invoice): jsPDF => {
   }
   
   // Colors
-  const primaryColor: [number, number, number] = [59, 130, 246]
+  const brandColor = hexToRgb(invoice.brandColor || '#3b82f6')
   const darkColor: [number, number, number] = [30, 41, 59]
   const grayColor: [number, number, number] = [100, 116, 139]
   const lightGray: [number, number, number] = [241, 245, 249]
   
+  // Currency symbol
+  const currencySymbol = invoice.currencySymbol || '$'
+  
   // ========== HEADER ==========
-  doc.setFillColor(...primaryColor)
+  doc.setFillColor(...brandColor)
   doc.rect(0, 0, pageWidth, 45, 'F')
+  
+  // Logo (if provided)
+  let headerContentY = 30
+  if (invoice.logo) {
+    try {
+      // Add logo to PDF
+      doc.addImage(invoice.logo, 'PNG', margin, 10, 40, 25)
+      headerContentY = 30
+    } catch (error) {
+      // If logo fails to load, continue without it
+      console.warn('Failed to add logo to PDF:', error)
+    }
+  }
   
   // Invoice title
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(28)
   doc.setFont('helvetica', 'bold')
-  doc.text('INVOICE', margin, 30)
+  doc.text('INVOICE', margin + (invoice.logo ? 45 : 0), headerContentY)
   
   // Invoice number
   doc.setFontSize(11)
   doc.setFont('helvetica', 'normal')
-  doc.text(sanitizeForPDF(invoice.invoiceNumber), pageWidth - margin, 30, { align: 'right' })
+  doc.text(sanitizeForPDF(invoice.invoiceNumber), pageWidth - margin, headerContentY, { align: 'right' })
   
   // ========== FROM / BILL TO / DATES ==========
   let y = 60
@@ -217,8 +243,8 @@ export const generatePDF = (invoice: Invoice): jsPDF => {
     const amount = typeof item.amount === 'number' && !isNaN(item.amount) ? item.amount : 0
     
     doc.text(qty.toString(), margin + 118, y + 3)
-    doc.text(`$${rate.toFixed(2)}`, margin + 135, y + 3)
-    doc.text(`$${amount.toFixed(2)}`, pageWidth - margin - 2, y + 3, { align: 'right' })
+    doc.text(`${currencySymbol}${rate.toFixed(2)}`, margin + 135, y + 3)
+    doc.text(`${currencySymbol}${amount.toFixed(2)}`, pageWidth - margin - 2, y + 3, { align: 'right' })
     
     y += 8
   }
@@ -242,25 +268,25 @@ export const generatePDF = (invoice: Invoice): jsPDF => {
   doc.setTextColor(...grayColor)
   doc.setFont('helvetica', 'normal')
   doc.text('Subtotal', pageWidth - margin - 65, y)
-  doc.text(`$${subtotal.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' })
+  doc.text(`${currencySymbol}${subtotal.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' })
   
   // Tax (if applicable)
   if (taxRate > 0) {
     y += 8
     doc.text(`Tax (${taxRate}%)`, pageWidth - margin - 65, y)
-    doc.text(`$${taxAmount.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' })
+    doc.text(`${currencySymbol}${taxAmount.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' })
   }
   
   // Total box
   y += 10
-  doc.setFillColor(...primaryColor)
+  doc.setFillColor(...brandColor)
   doc.roundedRect(pageWidth - margin - 68, y - 5, 70, 12, 2, 2, 'F')
   
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.text('TOTAL', pageWidth - margin - 63, y + 3)
-  doc.text(`$${total.toFixed(2)}`, pageWidth - margin - 5, y + 3, { align: 'right' })
+  doc.text(`${currencySymbol}${total.toFixed(2)}`, pageWidth - margin - 5, y + 3, { align: 'right' })
   
   // ========== NOTES ==========
   if (invoice.notes && typeof invoice.notes === 'string' && invoice.notes.trim()) {

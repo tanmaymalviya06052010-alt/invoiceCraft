@@ -39,11 +39,39 @@ export interface Invoice {
   // Branding
   logo?: string
   brandColor?: string
+  
+  // Currency
+  currency?: string
+  currencySymbol?: string
 }
 
 export type InvoiceTemplate = 'professional' | 'modern' | 'minimal' | 'creative'
 
-// Default invoice with placeholder values - actual IDs are generated at runtime
+// Supported currencies
+export const CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+  { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
+  { code: 'BRL', symbol: 'R$', name: 'Brazilian Real' },
+  { code: 'MXN', symbol: 'Mex$', name: 'Mexican Peso' },
+  { code: 'KRW', symbol: '₩', name: 'South Korean Won' },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal' },
+  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
+  { code: 'NZD', symbol: 'NZ$', name: 'New Zealand Dollar' },
+  { code: 'SEK', symbol: 'kr', name: 'Swedish Krona' },
+  { code: 'NOK', symbol: 'kr', name: 'Norwegian Krone' },
+  { code: 'DKK', symbol: 'kr', name: 'Danish Krone' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
+]
+
+// Default invoice
 export const defaultInvoice: Omit<Invoice, 'id' | 'invoiceNumber'> = {
   status: 'draft',
   createdAt: new Date().toISOString(),
@@ -76,4 +104,6 @@ export const defaultInvoice: Omit<Invoice, 'id' | 'invoiceNumber'> = {
   notes: 'Thank you for your business!',
   
   brandColor: '#3b82f6',
+  currency: 'USD',
+  currencySymbol: '$',
 }

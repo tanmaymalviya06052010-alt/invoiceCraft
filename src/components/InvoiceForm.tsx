@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiPlus, FiTrash2, FiDownload, FiSend, FiEye, FiSave, FiAlertCircle } from 'react-icons/fi'
-import { Invoice, InvoiceItem, defaultInvoice } from '@/types/invoice'
+import { FiPlus, FiTrash2, FiDownload, FiSend, FiEye, FiSave, FiAlertCircle, FiUpload, FiX } from 'react-icons/fi'
+import { Invoice, InvoiceItem, defaultInvoice, CURRENCIES } from '@/types/invoice'
 import { saveInvoice, getInvoice } from '@/lib/storage'
 import { downloadPDF } from '@/lib/pdf'
 import { 
@@ -29,6 +29,7 @@ interface ValidationErrors {
 
 export default function InvoiceForm({ id }: InvoiceFormProps) {
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -93,7 +94,6 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     
     let sanitizedValue: string | number = value
     
-    // Sanitize based on field type
     if (typeof value === 'string') {
       if (field.includes('email')) {
         sanitizedValue = sanitizeEmail(value)
@@ -104,7 +104,6 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
       }
     }
     
-    // Validate
     const error = validateField(field, sanitizedValue as string)
     setErrors(prev => ({ ...prev, [field]: error }))
     
@@ -147,10 +146,55 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     })
   }
 
+  const updateCurrency = (currencyCode: string) => {
+    if (!invoice) return
+    const currency = CURRENCIES.find(c => c.code === currencyCode)
+    if (currency) {
+      setInvoice({
+        ...invoice,
+        currency: currency.code,
+        currencySymbol: currency.symbol,
+      })
+    }
+  }
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !invoice) return
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file')
+      return
+    }
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Logo must be less than 2MB')
+      return
+    }
+    
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string
+      setInvoice({ ...invoice, logo: base64 })
+      toast.success('Logo uploaded!')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeLogo = () => {
+    if (!invoice) return
+    setInvoice({ ...invoice, logo: undefined })
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+    toast.success('Logo removed')
+  }
+
   const addItem = () => {
     if (!invoice) return
     
-    // Limit to 100 items max
     if (invoice.items.length >= 100) {
       toast.error('Maximum 100 items allowed')
       return
@@ -187,7 +231,6 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     
     if (!invoice) return false
     
-    // Required fields
     if (!invoice.clientName.trim()) {
       newErrors.clientName = 'Client name is required'
     }
@@ -196,7 +239,6 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
       newErrors.invoiceNumber = 'Invoice number is required'
     }
     
-    // Email validation
     if (invoice.fromEmail && !isValidEmail(invoice.fromEmail)) {
       newErrors.fromEmail = 'Invalid email format'
     }
@@ -205,12 +247,10 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
       newErrors.clientEmail = 'Invalid email format'
     }
     
-    // Phone validation
     if (invoice.fromPhone && !isValidPhone(invoice.fromPhone)) {
       newErrors.fromPhone = 'Invalid phone format'
     }
     
-    // Items validation
     invoice.items.forEach((item, index) => {
       if (item.quantity < 0) {
         newErrors[`item_${index}_quantity`] = 'Quantity cannot be negative'
@@ -275,26 +315,26 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
       return
     }
     
-    // Save first
     saveInvoice(invoice)
     
-    // Build email content
     const subject = encodeURIComponent(`Invoice ${invoice.invoiceNumber} from ${invoice.fromName || 'Your Business'}`)
     const body = encodeURIComponent(
       `Hi ${invoice.clientName},\n\n` +
-      `Please find attached invoice ${invoice.invoiceNumber} for $${invoice.total.toFixed(2)}.\n\n` +
+      `Please find attached invoice ${invoice.invoiceNumber} for ${invoice.currencySymbol || '$'}${invoice.total.toFixed(2)}.\n\n` +
       `Due date: ${new Date(invoice.dueDate).toLocaleDateString()}\n\n` +
       `Thank you for your business!\n\n` +
       `Best regards,\n${invoice.fromName}`
     )
     
-    // Open mailto in same window instead of popup
     if (invoice.clientEmail) {
-      const mailtoUrl = `mailto:${invoice.clientEmail}?subject=${subject}&body=${body}`
-      window.location.href = mailtoUrl
+      window.location.href = `mailto:${invoice.clientEmail}?subject=${subject}&body=${body}`
     } else {
       toast.error('Please enter client email address')
     }
+  }
+
+  const getCurrencySymbol = () => {
+    return invoice?.currencySymbol || '$'
   }
 
   if (isLoading || !invoice) {
@@ -339,6 +379,86 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
               {isSaving ? 'Generating...' : 'Download PDF'}
             </button>
           </div>
+        </div>
+
+        {/* Branding Section */}
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Branding</h2>
+          <div className="flex items-start gap-6">
+            {/* Logo Upload */}
+            <div className="flex-shrink-0">
+              <label className="label">Logo</label>
+              <div className="relative">
+                {invoice.logo ? (
+                  <div className="relative w-32 h-32 border-2 border-gray-200 rounded-lg overflow-hidden">
+                    <img 
+                      src={invoice.logo} 
+                      alt="Logo" 
+                      className="w-full h-full object-contain bg-gray-50"
+                    />
+                    <button
+                      onClick={removeLogo}
+                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    >
+                      <FiX className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-500 hover:border-primary-500 hover:text-primary-500 transition-colors"
+                  >
+                    <FiUpload className="w-6 h-6 mb-2" />
+                    <span className="text-xs">Upload Logo</span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Max 2MB</p>
+            </div>
+            
+            {/* Brand Color */}
+            <div className="flex-1">
+              <label className="label">Brand Color</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={invoice.brandColor || '#3b82f6'}
+                  onChange={(e) => updateField('brandColor', e.target.value)}
+                  className="w-12 h-10 rounded cursor-pointer border-0"
+                />
+                <input
+                  type="text"
+                  value={invoice.brandColor || '#3b82f6'}
+                  onChange={(e) => updateField('brandColor', e.target.value)}
+                  className="input-field flex-1"
+                  placeholder="#3b82f6"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Currency Selection */}
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Currency</h2>
+          <select
+            value={invoice.currency || 'USD'}
+            onChange={(e) => updateCurrency(e.target.value)}
+            className="input-field"
+          >
+            {CURRENCIES.map((currency) => (
+              <option key={currency.code} value={currency.code}>
+                {currency.symbol} - {currency.name} ({currency.code})
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* From Section */}
@@ -533,7 +653,7 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
                     />
                   </div>
                   <div className="w-28 flex-shrink-0">
-                    <label className="label">Rate ($)</label>
+                    <label className="label">Rate ({getCurrencySymbol()})</label>
                     <input
                       type="number"
                       className={`input-field ${errors[`item_${index}_rate`] ? 'border-red-500' : ''}`}
@@ -547,7 +667,7 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
                   <div className="w-28 flex-shrink-0">
                     <label className="label">Amount</label>
                     <div className="input-field bg-gray-100 font-medium text-right truncate">
-                      ${item.amount.toFixed(2)}
+                      {getCurrencySymbol()}{item.amount.toFixed(2)}
                     </div>
                   </div>
                 </div>
@@ -592,18 +712,18 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
             <div className="text-right min-w-[180px]">
               <div className="flex justify-between text-sm text-gray-600 mb-1">
                 <span>Subtotal</span>
-                <span className="font-medium">${invoice.subtotal.toFixed(2)}</span>
+                <span className="font-medium">{getCurrencySymbol()}{invoice.subtotal.toFixed(2)}</span>
               </div>
               {invoice.taxRate > 0 && (
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
                   <span>Tax ({invoice.taxRate}%)</span>
-                  <span className="font-medium">${invoice.taxAmount.toFixed(2)}</span>
+                  <span className="font-medium">{getCurrencySymbol()}{invoice.taxAmount.toFixed(2)}</span>
                 </div>
               )}
               <div className="border-t border-gray-200 mt-2 pt-2">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-gray-900">Total</span>
-                  <span className="text-2xl font-bold text-primary-600">${invoice.total.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-primary-600">{getCurrencySymbol()}{invoice.total.toFixed(2)}</span>
                 </div>
               </div>
             </div>

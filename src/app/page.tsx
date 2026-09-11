@@ -136,7 +136,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Enter Details</h3>
               <p className="text-gray-600">
-                Add client info, line items, and rates. Or use saved templates.
+                Add client info, line items, rates, and select your currency.
               </p>
             </div>
 
@@ -178,13 +178,10 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               'Professional PDF Export',
-              'Custom Branding & Logo',
+              'Custom Logo & Branding',
               'Tax Calculations',
-              'Multiple Currencies',
-              'Recurring Invoices',
-              'Payment Tracking',
-              'Client Management',
-              'Invoice Templates',
+              '20+ Currency Support',
+              'Live Invoice Preview',
               'Mobile Friendly',
             ].map((feature, index) => (
               <div key={index} className="flex items-center gap-3 bg-white p-4 rounded-lg">

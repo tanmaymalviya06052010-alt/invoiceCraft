@@ -181,7 +181,7 @@ export default function Home() {
               'Custom Logo & Branding',
               'Tax Calculations',
               '20+ Currency Support',
-              'Live Invoice Preview',
+              '4 Invoice Templates',
               'Mobile Friendly',
             ].map((feature, index) => (
               <div key={index} className="flex items-center gap-3 bg-white p-4 rounded-lg">

@@ -167,7 +167,7 @@ export default function DashboardPage() {
                     </span>
                     <span className="text-sm text-gray-500">{invoice.invoiceNumber}</span>
                   </div>
-                  <div className="text-lg font-medium text-gray-900">{invoice.clientName || 'Unnamed Client'}</div>
+                  <div className="text-lg font-medium text-gray-900">{invoice.client?.name || 'Unnamed Client'}</div>
                   <div className="text-sm text-gray-600">
                     {format(new Date(invoice.createdAt), 'MMM d, yyyy')} • Due {format(new Date(invoice.dueDate), 'MMM d, yyyy')}
                   </div>

@@ -4,17 +4,23 @@
 
 /**
  * Sanitize string input by removing potentially dangerous characters
+ * Preserves spaces and normal text while removing XSS vectors
  */
 export const sanitizeString = (input: string): string => {
   if (!input || typeof input !== 'string') return ''
   
   return input
-    .replace(/[<>]/g, '') // Remove angle brackets
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/on\w+=/gi, '') // Remove event handlers
-    .replace(/data:/gi, '') // Remove data: protocol
-    .replace(/vbscript:/gi, '') // Remove vbscript: protocol
+    .replace(/[<>]/g, '') // Remove angle brackets only
     .trim()
+}
+
+/**
+ * Sanitize text input for form fields - preserves spaces and normal text
+ */
+export const sanitizeTextInput = (input: string): string => {
+  if (!input || typeof input !== 'string') return ''
+  // Only remove angle brackets, preserve everything else including spaces
+  return input.replace(/[<>]/g, '')
 }
 
 /**

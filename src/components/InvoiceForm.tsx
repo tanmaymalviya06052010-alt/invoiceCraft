@@ -7,7 +7,7 @@ import { Invoice, InvoiceItem, defaultInvoice } from '@/types/invoice'
 import { saveInvoice, getInvoice } from '@/lib/storage'
 import { downloadPDF } from '@/lib/pdf'
 import { 
-  sanitizeString, 
+  sanitizeTextInput, 
   sanitizeEmail, 
   sanitizePhone, 
   sanitizeNumber, 
@@ -100,7 +100,7 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
       } else if (field.includes('phone')) {
         sanitizedValue = sanitizePhone(value)
       } else if (field !== 'id' && field !== 'status') {
-        sanitizedValue = sanitizeString(value)
+        sanitizedValue = sanitizeTextInput(value)
       }
     }
     
@@ -118,7 +118,7 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     
     if (typeof value === 'string') {
       if (field === 'description') {
-        sanitizedValue = sanitizeString(value)
+        sanitizedValue = sanitizeTextInput(value)
       }
     } else if (typeof value === 'number') {
       sanitizedValue = sanitizeNumber(value, 0, field === 'quantity' ? 10000 : 1000000)

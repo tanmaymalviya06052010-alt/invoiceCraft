@@ -55,9 +55,9 @@ export default function PhoneInput({
   }
 
   return (
-    <div className="flex" ref={dropdownRef}>
+    <div className="flex w-full" ref={dropdownRef}>
       {/* Country code selector */}
-      <div className="relative">
+      <div className="relative flex-shrink-0">
         <button
           type="button"
           onClick={() => {
@@ -121,7 +121,7 @@ export default function PhoneInput({
         value={value}
         onChange={(e) => onChange(e.target.value, phoneCode)}
         placeholder={placeholder}
-        className="flex-1 px-4 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+        className="flex-1 min-w-0 px-4 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
       />
     </div>
   )

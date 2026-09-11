@@ -3,13 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { FiPlus, FiTrash2, FiDownload, FiSend, FiEye, FiSave, FiAlertCircle, FiUpload, FiX } from 'react-icons/fi'
-import { Invoice, InvoiceItem, defaultInvoice, CURRENCIES, TEMPLATE_OPTIONS, InvoiceTemplate } from '@/types/invoice'
+import { Invoice, InvoiceItem, defaultInvoice, CURRENCIES, TEMPLATE_OPTIONS, ContactInfo, Address } from '@/types/invoice'
 import { saveInvoice, getInvoice } from '@/lib/storage'
 import { downloadPDF } from '@/lib/pdf'
 import { 
   sanitizeTextInput, 
   sanitizeEmail, 
-  sanitizePhone, 
   sanitizeNumber, 
   isValidEmail, 
   isValidPhone,
@@ -18,6 +17,7 @@ import {
 } from '@/lib/validation'
 import toast from 'react-hot-toast'
 import InvoicePreview from '@/components/InvoicePreview'
+import ContactForm from '@/components/ContactForm'
 
 interface InvoiceFormProps {
   id?: string
@@ -40,7 +40,9 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     if (id) {
       const existing = getInvoice(id)
       if (existing) {
-        setInvoice(existing)
+        // Migrate old format if needed
+        const migrated = migrateInvoice(existing)
+        setInvoice(migrated)
       } else {
         toast.error('Invoice not found')
         router.push('/dashboard')
@@ -55,59 +57,64 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     setIsLoading(false)
   }, [id, router])
 
-  const validateField = (field: string, value: string): string => {
-    switch (field) {
-      case 'fromEmail':
-      case 'clientEmail':
-        if (value && !isValidEmail(value)) {
-          return 'Please enter a valid email address'
-        }
-        return ''
-      case 'fromPhone':
-        if (value && !isValidPhone(value)) {
-          return 'Please enter a valid phone number'
-        }
-        return ''
-      case 'clientName':
-        if (!value.trim()) {
-          return 'Client name is required'
-        }
-        if (value.length > 200) {
-          return 'Client name is too long'
-        }
-        return ''
-      case 'invoiceNumber':
-        if (!value.trim()) {
-          return 'Invoice number is required'
-        }
-        if (value.length > 50) {
-          return 'Invoice number is too long'
-        }
-        return ''
-      default:
-        return ''
+  // Migrate old invoice format to new nested structure
+  const migrateInvoice = (inv: any): Invoice => {
+    // If already using new format
+    if (inv.from && typeof inv.from === 'object' && inv.from.name !== undefined) {
+      return inv
+    }
+    
+    // Migrate old format
+    return {
+      ...inv,
+      from: {
+        name: inv.fromName || '',
+        email: inv.fromEmail || '',
+        phone: inv.fromPhone || '',
+        phoneCode: '+1',
+        address: {
+          street: inv.fromAddress || '',
+          city: '',
+          state: '',
+          zip: '',
+          country: '',
+          countryCode: '',
+        },
+        taxId: '',
+      },
+      client: {
+        name: inv.clientName || '',
+        email: inv.clientEmail || '',
+        phone: '',
+        phoneCode: '+1',
+        address: {
+          street: inv.clientAddress || '',
+          city: '',
+          state: '',
+          zip: '',
+          country: '',
+          countryCode: '',
+        },
+        taxId: '',
+      },
+      terms: inv.terms || 'Payment is due within 30 days of invoice date.',
+      paymentTerms: inv.paymentTerms || 'Net 30',
     }
   }
 
-  const updateField = (field: keyof Invoice, value: string | number) => {
+  const updateField = (field: keyof Invoice, value: any) => {
     if (!invoice) return
-    
-    let sanitizedValue: string | number = value
-    
-    if (typeof value === 'string') {
-      if (field.includes('email')) {
-        sanitizedValue = sanitizeEmail(value)
-      } else if (field.includes('phone')) {
-        sanitizedValue = sanitizePhone(value)
-      } else if (field !== 'id' && field !== 'status') {
-        sanitizedValue = sanitizeTextInput(value)
-      }
-    }
-    
-    const error = validateField(field, sanitizedValue as string)
-    setErrors(prev => ({ ...prev, [field]: error }))
-    
-    setInvoice({ ...invoice, [field]: sanitizedValue })
+    setInvoice({ ...invoice, [field]: value })
+  }
+
+  const updateFrom = (from: ContactInfo) => {
+    if (!invoice) return
+    setInvoice({ ...invoice, from })
+  }
+
+  const updateClient = (client: ContactInfo) => {
+    if (!invoice) return
+    setInvoice({ ...invoice, client })
   }
 
   const updateItem = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
@@ -115,10 +122,8 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     
     let sanitizedValue: string | number = value
     
-    if (typeof value === 'string') {
-      if (field === 'description') {
-        sanitizedValue = sanitizeTextInput(value)
-      }
+    if (typeof value === 'string' && field === 'description') {
+      sanitizedValue = sanitizeTextInput(value)
     } else if (typeof value === 'number') {
       sanitizedValue = sanitizeNumber(value, 0, field === 'quantity' ? 10000 : 1000000)
     }
@@ -162,13 +167,11 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     const file = e.target.files?.[0]
     if (!file || !invoice) return
     
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file')
       return
     }
     
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast.error('Logo must be less than 2MB')
       return
@@ -231,7 +234,8 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     
     if (!invoice) return false
     
-    if (!invoice.clientName.trim()) {
+    // Required fields
+    if (!invoice.client.name.trim()) {
       newErrors.clientName = 'Client name is required'
     }
     
@@ -239,18 +243,25 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
       newErrors.invoiceNumber = 'Invoice number is required'
     }
     
-    if (invoice.fromEmail && !isValidEmail(invoice.fromEmail)) {
+    // Email validation
+    if (invoice.from.email && !isValidEmail(invoice.from.email)) {
       newErrors.fromEmail = 'Invalid email format'
     }
     
-    if (invoice.clientEmail && !isValidEmail(invoice.clientEmail)) {
+    if (invoice.client.email && !isValidEmail(invoice.client.email)) {
       newErrors.clientEmail = 'Invalid email format'
     }
     
-    if (invoice.fromPhone && !isValidPhone(invoice.fromPhone)) {
+    // Phone validation
+    if (invoice.from.phone && !isValidPhone(invoice.from.phone)) {
       newErrors.fromPhone = 'Invalid phone format'
     }
     
+    if (invoice.client.phone && !isValidPhone(invoice.client.phone)) {
+      newErrors.clientPhone = 'Invalid phone format'
+    }
+    
+    // Items validation
     invoice.items.forEach((item, index) => {
       if (item.quantity < 0) {
         newErrors[`item_${index}_quantity`] = 'Quantity cannot be negative'
@@ -317,17 +328,17 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
     
     saveInvoice(invoice)
     
-    const subject = encodeURIComponent(`Invoice ${invoice.invoiceNumber} from ${invoice.fromName || 'Your Business'}`)
+    const subject = encodeURIComponent(`Invoice ${invoice.invoiceNumber} from ${invoice.from.name || 'Your Business'}`)
     const body = encodeURIComponent(
-      `Hi ${invoice.clientName},\n\n` +
+      `Hi ${invoice.client.name},\n\n` +
       `Please find attached invoice ${invoice.invoiceNumber} for ${invoice.currencySymbol || '$'}${invoice.total.toFixed(2)}.\n\n` +
       `Due date: ${new Date(invoice.dueDate).toLocaleDateString()}\n\n` +
       `Thank you for your business!\n\n` +
-      `Best regards,\n${invoice.fromName}`
+      `Best regards,\n${invoice.from.name}`
     )
     
-    if (invoice.clientEmail) {
-      window.location.href = `mailto:${invoice.clientEmail}?subject=${subject}&body=${body}`
+    if (invoice.client.email) {
+      window.location.href = `mailto:${invoice.client.email}?subject=${subject}&body=${body}`
     } else {
       toast.error('Please enter client email address')
     }
@@ -335,6 +346,12 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
 
   const getCurrencySymbol = () => {
     return invoice?.currencySymbol || '$'
+  }
+
+  const formatAddress = (address: Address) => {
+    const parts = [address.street, address.city, address.state, address.zip].filter(Boolean)
+    if (address.country) parts.push(address.country)
+    return parts.join(', ')
   }
 
   if (isLoading || !invoice) {
@@ -445,176 +462,63 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
           </div>
         </div>
 
-        {/* Currency Selection */}
+        {/* Currency & Template */}
         <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Currency</h2>
-          <select
-            value={invoice.currency || 'USD'}
-            onChange={(e) => updateCurrency(e.target.value)}
-            className="input-field"
-          >
-            {CURRENCIES.map((currency) => (
-              <option key={currency.code} value={currency.code}>
-                {currency.symbol} - {currency.name} ({currency.code})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Template Selection */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Template</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {TEMPLATE_OPTIONS.map((template) => (
-              <button
-                key={template.id}
-                onClick={() => setInvoice({ ...invoice, template: template.id })}
-                className={`p-3 rounded-lg border-2 text-left transition-all ${
-                  invoice.template === template.id
-                    ? 'border-primary-500 bg-primary-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Settings</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {/* Currency */}
+            <div>
+              <label className="label">Currency</label>
+              <select
+                value={invoice.currency || 'USD'}
+                onChange={(e) => updateCurrency(e.target.value)}
+                className="input-field"
               >
-                <div className="font-medium text-sm text-gray-900">{template.name}</div>
-                <div className="text-xs text-gray-500 mt-1">{template.description}</div>
-              </button>
-            ))}
+                {CURRENCIES.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.symbol} - {currency.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Template */}
+            <div>
+              <label className="label">Invoice Template</label>
+              <select
+                value={invoice.template || 'professional'}
+                onChange={(e) => updateField('template', e.target.value)}
+                className="input-field"
+              >
+                {TEMPLATE_OPTIONS.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} - {template.description}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
         {/* From Section */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">From</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Your Name / Business</label>
-              <input
-                type="text"
-                className="input-field"
-                value={invoice.fromName}
-                onChange={(e) => updateField('fromName', e.target.value)}
-                placeholder="John's Design Studio"
-                maxLength={200}
-              />
-            </div>
-            <div>
-              <label className="label">Email</label>
-              <input
-                type="email"
-                className={`input-field ${errors.fromEmail ? 'border-red-500' : ''}`}
-                value={invoice.fromEmail}
-                onChange={(e) => updateField('fromEmail', e.target.value)}
-                placeholder="john@example.com"
-                maxLength={254}
-              />
-              {errors.fromEmail && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <FiAlertCircle className="w-3 h-3" />
-                  {errors.fromEmail}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="label">Phone</label>
-              <input
-                type="tel"
-                className={`input-field ${errors.fromPhone ? 'border-red-500' : ''}`}
-                value={invoice.fromPhone}
-                onChange={(e) => updateField('fromPhone', e.target.value)}
-                placeholder="+1 (555) 123-4567"
-                maxLength={20}
-              />
-              {errors.fromPhone && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <FiAlertCircle className="w-3 h-3" />
-                  {errors.fromPhone}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="label">Invoice Number</label>
-              <input
-                type="text"
-                className={`input-field ${errors.invoiceNumber ? 'border-red-500' : ''}`}
-                value={invoice.invoiceNumber}
-                onChange={(e) => updateField('invoiceNumber', e.target.value)}
-                maxLength={50}
-              />
-              {errors.invoiceNumber && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <FiAlertCircle className="w-3 h-3" />
-                  {errors.invoiceNumber}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="mt-4">
-            <label className="label">Address</label>
-            <textarea
-              className="input-field"
-              rows={2}
-              value={invoice.fromAddress}
-              onChange={(e) => updateField('fromAddress', e.target.value)}
-              placeholder="123 Main St, City, State 12345"
-              maxLength={500}
-            />
-          </div>
-        </div>
+        <ContactForm
+          value={invoice.from}
+          onChange={updateFrom}
+          label="From (Your Business)"
+          showTaxId
+        />
 
         {/* Client Section */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Bill To</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Client Name *</label>
-              <input
-                type="text"
-                className={`input-field ${errors.clientName ? 'border-red-500' : ''}`}
-                value={invoice.clientName}
-                onChange={(e) => updateField('clientName', e.target.value)}
-                placeholder="Client Company"
-                maxLength={200}
-              />
-              {errors.clientName && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <FiAlertCircle className="w-3 h-3" />
-                  {errors.clientName}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="label">Client Email</label>
-              <input
-                type="email"
-                className={`input-field ${errors.clientEmail ? 'border-red-500' : ''}`}
-                value={invoice.clientEmail}
-                onChange={(e) => updateField('clientEmail', e.target.value)}
-                placeholder="client@example.com"
-                maxLength={254}
-              />
-              {errors.clientEmail && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <FiAlertCircle className="w-3 h-3" />
-                  {errors.clientEmail}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="mt-4">
-            <label className="label">Client Address</label>
-            <textarea
-              className="input-field"
-              rows={2}
-              value={invoice.clientAddress}
-              onChange={(e) => updateField('clientAddress', e.target.value)}
-              placeholder="456 Client Ave, City, State 12345"
-              maxLength={500}
-            />
-          </div>
-        </div>
+        <ContactForm
+          value={invoice.client}
+          onChange={updateClient}
+          label="Bill To (Client)"
+          showTaxId
+        />
 
-        {/* Dates */}
+        {/* Dates & PO Number */}
         <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Details</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Invoice Date</label>
@@ -632,6 +536,33 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
                 className="input-field"
                 value={invoice.dueDate.split('T')[0]}
                 onChange={(e) => updateField('dueDate', new Date(e.target.value).toISOString())}
+              />
+            </div>
+            <div>
+              <label className="label">Invoice Number</label>
+              <input
+                type="text"
+                className={`input-field ${errors.invoiceNumber ? 'border-red-500' : ''}`}
+                value={invoice.invoiceNumber}
+                onChange={(e) => updateField('invoiceNumber', e.target.value)}
+                maxLength={50}
+              />
+              {errors.invoiceNumber && (
+                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                  <FiAlertCircle className="w-3 h-3" />
+                  {errors.invoiceNumber}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="label">PO Number (optional)</label>
+              <input
+                type="text"
+                className="input-field"
+                value={invoice.poNumber || ''}
+                onChange={(e) => updateField('poNumber', e.target.value)}
+                placeholder="PO-12345"
+                maxLength={50}
               />
             </div>
           </div>
@@ -706,7 +637,7 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
           </div>
         </div>
 
-        {/* Tax & Notes */}
+        {/* Tax & Totals */}
         <div className="card">
           <div className="flex justify-between items-start gap-8">
             <div className="flex-1">
@@ -749,16 +680,36 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
               </div>
             </div>
           </div>
-          <div className="mt-4">
-            <label className="label">Notes</label>
-            <textarea
-              className="input-field"
-              rows={3}
-              value={invoice.notes}
-              onChange={(e) => updateField('notes', e.target.value)}
-              placeholder="Payment terms, thank you note, etc."
-              maxLength={1000}
-            />
+        </div>
+
+        {/* Notes & Terms */}
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h2>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="label">Notes (visible to client)</label>
+              <textarea
+                className="input-field"
+                rows={2}
+                value={invoice.notes}
+                onChange={(e) => updateField('notes', e.target.value)}
+                placeholder="Thank you for your business!"
+                maxLength={500}
+              />
+            </div>
+            
+            <div>
+              <label className="label">Terms & Conditions</label>
+              <textarea
+                className="input-field"
+                rows={3}
+                value={invoice.terms}
+                onChange={(e) => updateField('terms', e.target.value)}
+                placeholder="Payment terms, late fees, etc."
+                maxLength={1000}
+              />
+            </div>
           </div>
         </div>
 

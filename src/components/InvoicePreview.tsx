@@ -7,127 +7,16 @@ interface InvoicePreviewProps {
   invoice: Invoice
 }
 
-// ========== PROFESSIONAL TEMPLATE ==========
-function ProfessionalTemplate({ invoice, currencySymbol, brandColor }: { invoice: Invoice; currencySymbol: string; brandColor: string }) {
-  return (
-    <>
-      {/* Header */}
-      <div className="p-6 text-white" style={{ backgroundColor: brandColor }}>
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-4">
-            {invoice.logo && (
-              <img src={invoice.logo} alt="Logo" className="h-12 w-auto object-contain bg-white/10 rounded p-1" />
-            )}
-            <div>
-              <h1 className="text-2xl font-bold">INVOICE</h1>
-              <p className="text-white/80 mt-1">{invoice.invoiceNumber}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <StatusBadge status={invoice.status} />
-          </div>
-        </div>
-      </div>
-      <InvoiceBody invoice={invoice} currencySymbol={currencySymbol} brandColor={brandColor} />
-    </>
-  )
+// ========== HELPER: Format address ==========
+function formatAddress(address: any): string {
+  if (!address) return ''
+  const parts = [address.street, address.city, address.state, address.zip].filter(Boolean)
+  if (address.country) parts.push(address.country)
+  return parts.join(', ')
 }
 
-// ========== MODERN TEMPLATE ==========
-function ModernTemplate({ invoice, currencySymbol, brandColor }: { invoice: Invoice; currencySymbol: string; brandColor: string }) {
-  return (
-    <>
-      {/* Header with side accent */}
-      <div className="flex">
-        <div className="w-2" style={{ backgroundColor: brandColor }}></div>
-        <div className="flex-1 p-6">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-4">
-              {invoice.logo && (
-                <img src={invoice.logo} alt="Logo" className="h-14 w-auto object-contain" />
-              )}
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">INVOICE</h1>
-                <p className="text-gray-500 mt-1">{invoice.invoiceNumber}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <StatusBadge status={invoice.status} variant="outlined" color={brandColor} />
-              <div className="mt-2 text-sm text-gray-500">
-                <div>{format(new Date(invoice.createdAt), 'MMM d, yyyy')}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <InvoiceBody invoice={invoice} currencySymbol={currencySymbol} brandColor={brandColor} />
-    </>
-  )
-}
-
-// ========== MINIMAL TEMPLATE ==========
-function MinimalTemplate({ invoice, currencySymbol, brandColor }: { invoice: Invoice; currencySymbol: string; brandColor: string }) {
-  return (
-    <>
-      {/* Header - Clean & minimal */}
-      <div className="p-8 border-b border-gray-200">
-        <div className="flex justify-between items-start">
-          <div>
-            {invoice.logo && (
-              <img src={invoice.logo} alt="Logo" className="h-10 w-auto object-contain mb-4" />
-            )}
-            <h1 className="text-4xl font-light text-gray-900 tracking-tight">INVOICE</h1>
-            <p className="text-gray-400 mt-2 text-sm">{invoice.invoiceNumber}</p>
-          </div>
-          <div className="text-right">
-            <StatusBadge status={invoice.status} variant="minimal" />
-            <div className="mt-4 space-y-1 text-sm text-gray-500">
-              <div><span className="text-gray-400">Date:</span> {format(new Date(invoice.createdAt), 'MMM d, yyyy')}</div>
-              <div><span className="text-gray-400">Due:</span> {format(new Date(invoice.dueDate), 'MMM d, yyyy')}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <InvoiceBody invoice={invoice} currencySymbol={currencySymbol} brandColor={brandColor} minimal />
-    </>
-  )
-}
-
-// ========== CREATIVE TEMPLATE ==========
-function CreativeTemplate({ invoice, currencySymbol, brandColor }: { invoice: Invoice; currencySymbol: string; brandColor: string }) {
-  return (
-    <>
-      {/* Header with gradient */}
-      <div className="p-6 text-white" style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${brandColor}cc 100%)` }}>
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            {invoice.logo && (
-              <div className="bg-white/20 rounded-xl p-2">
-                <img src={invoice.logo} alt="Logo" className="h-10 w-auto object-contain" />
-              </div>
-            )}
-            <div>
-              <h1 className="text-2xl font-bold tracking-wide">INVOICE</h1>
-              <p className="text-white/70 text-sm mt-1">{invoice.invoiceNumber}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <StatusBadge status={invoice.status} variant="creative" />
-          </div>
-        </div>
-      </div>
-      {/* Date ribbon */}
-      <div className="px-6 py-3 bg-gray-50 flex justify-between text-sm text-gray-600">
-        <span>Issued: {format(new Date(invoice.createdAt), 'MMM d, yyyy')}</span>
-        <span>Due: {format(new Date(invoice.dueDate), 'MMM d, yyyy')}</span>
-      </div>
-      <InvoiceBody invoice={invoice} currencySymbol={currencySymbol} brandColor={brandColor} />
-    </>
-  )
-}
-
-// ========== SHARED COMPONENTS ==========
-function StatusBadge({ status, variant = 'filled', color }: { status: string; variant?: string; color?: string }) {
+// ========== STATUS BADGE ==========
+function StatusBadge({ status, variant = 'filled' }: { status: string; variant?: string }) {
   const colors: Record<string, string> = {
     paid: 'bg-green-500 text-white',
     sent: 'bg-yellow-500 text-white',
@@ -173,7 +62,11 @@ function StatusBadge({ status, variant = 'filled', color }: { status: string; va
   )
 }
 
+// ========== SHARED INVOICE BODY ==========
 function InvoiceBody({ invoice, currencySymbol, brandColor, minimal = false }: { invoice: Invoice; currencySymbol: string; brandColor: string; minimal?: boolean }) {
+  const from = invoice.from || {}
+  const client = invoice.client || {}
+  
   return (
     <div className="p-6 space-y-6">
       {/* From & To */}
@@ -181,21 +74,35 @@ function InvoiceBody({ invoice, currencySymbol, brandColor, minimal = false }: {
         <div>
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">From</h3>
           <div className="text-sm">
-            {invoice.fromName && <p className={`font-medium text-gray-900 ${minimal ? 'text-base' : ''}`}>{invoice.fromName}</p>}
-            {invoice.fromEmail && <p className="text-gray-600">{invoice.fromEmail}</p>}
-            {invoice.fromPhone && <p className="text-gray-600">{invoice.fromPhone}</p>}
-            {invoice.fromAddress && <p className="text-gray-600 whitespace-pre-line mt-1">{invoice.fromAddress}</p>}
+            {from.name && <p className={`font-medium text-gray-900 ${minimal ? 'text-base' : ''}`}>{from.name}</p>}
+            {from.email && <p className="text-gray-600">{from.email}</p>}
+            {from.phone && <p className="text-gray-600">{from.phoneCode} {from.phone}</p>}
+            {from.address && formatAddress(from.address) && (
+              <p className="text-gray-600 whitespace-pre-line mt-1">{formatAddress(from.address)}</p>
+            )}
+            {from.taxId && <p className="text-gray-500 mt-1">Tax ID: {from.taxId}</p>}
           </div>
         </div>
         <div>
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Bill To</h3>
           <div className="text-sm">
-            {invoice.clientName && <p className={`font-medium text-gray-900 ${minimal ? 'text-base' : ''}`}>{invoice.clientName}</p>}
-            {invoice.clientEmail && <p className="text-gray-600">{invoice.clientEmail}</p>}
-            {invoice.clientAddress && <p className="text-gray-600 whitespace-pre-line mt-1">{invoice.clientAddress}</p>}
+            {client.name && <p className={`font-medium text-gray-900 ${minimal ? 'text-base' : ''}`}>{client.name}</p>}
+            {client.email && <p className="text-gray-600">{client.email}</p>}
+            {client.phone && <p className="text-gray-600">{client.phoneCode} {client.phone}</p>}
+            {client.address && formatAddress(client.address) && (
+              <p className="text-gray-600 whitespace-pre-line mt-1">{formatAddress(client.address)}</p>
+            )}
+            {client.taxId && <p className="text-gray-500 mt-1">Tax ID: {client.taxId}</p>}
           </div>
         </div>
       </div>
+
+      {/* PO Number */}
+      {invoice.poNumber && (
+        <div className="text-sm text-gray-600">
+          <span className="font-medium">PO Number:</span> {invoice.poNumber}
+        </div>
+      )}
 
       {/* Items Table */}
       <div className="overflow-x-auto">
@@ -209,8 +116,8 @@ function InvoiceBody({ invoice, currencySymbol, brandColor, minimal = false }: {
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item, index) => (
-              <tr key={item.id} className={`border-b ${minimal ? 'border-gray-100' : 'border-gray-100'}`}>
+            {invoice.items.map((item) => (
+              <tr key={item.id} className="border-b border-gray-100">
                 <td className="py-3 text-gray-900">{item.description || '-'}</td>
                 <td className="py-3 text-center text-gray-600">{item.quantity}</td>
                 <td className="py-3 text-right text-gray-600">{currencySymbol}{item.rate.toFixed(2)}</td>
@@ -234,7 +141,7 @@ function InvoiceBody({ invoice, currencySymbol, brandColor, minimal = false }: {
               <span className="font-medium">{currencySymbol}{invoice.taxAmount.toFixed(2)}</span>
             </div>
           )}
-          <div className={`flex justify-between pt-2 ${minimal ? 'border-t border-gray-200' : 'border-t border-gray-200'}`}>
+          <div className="flex justify-between pt-2 border-t border-gray-200">
             <span className="font-semibold text-gray-900">Total</span>
             <span className="text-xl font-bold" style={{ color: brandColor }}>
               {currencySymbol}{invoice.total.toFixed(2)}
@@ -243,19 +150,145 @@ function InvoiceBody({ invoice, currencySymbol, brandColor, minimal = false }: {
         </div>
       </div>
 
-      {/* Notes */}
-      {invoice.notes && (
-        <div className="pt-4 border-t border-gray-200">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notes</h3>
-          <p className="text-sm text-gray-600 whitespace-pre-line">{invoice.notes}</p>
-        </div>
-      )}
+      {/* Notes & Terms */}
+      <div className="space-y-4">
+        {invoice.notes && (
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</h3>
+            <p className="text-sm text-gray-600 whitespace-pre-line">{invoice.notes}</p>
+          </div>
+        )}
+        {invoice.terms && (
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Terms & Conditions</h3>
+            <p className="text-xs text-gray-500 whitespace-pre-line">{invoice.terms}</p>
+          </div>
+        )}
+      </div>
 
       {/* Footer */}
       <div className="pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
         Created with InvoiceCraft
       </div>
     </div>
+  )
+}
+
+// ========== PROFESSIONAL TEMPLATE ==========
+function ProfessionalTemplate({ invoice, currencySymbol, brandColor }: { invoice: Invoice; currencySymbol: string; brandColor: string }) {
+  return (
+    <>
+      <div className="p-6 text-white" style={{ backgroundColor: brandColor }}>
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-4">
+            {invoice.logo && (
+              <img src={invoice.logo} alt="Logo" className="h-12 w-auto object-contain bg-white/10 rounded p-1" />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold">INVOICE</h1>
+              <p className="text-white/80 mt-1">{invoice.invoiceNumber}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <StatusBadge status={invoice.status} />
+            <div className="mt-2 text-sm text-white/70">
+              <div>Date: {format(new Date(invoice.createdAt), 'MMM d, yyyy')}</div>
+              <div>Due: {format(new Date(invoice.dueDate), 'MMM d, yyyy')}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <InvoiceBody invoice={invoice} currencySymbol={currencySymbol} brandColor={brandColor} />
+    </>
+  )
+}
+
+// ========== MODERN TEMPLATE ==========
+function ModernTemplate({ invoice, currencySymbol, brandColor }: { invoice: Invoice; currencySymbol: string; brandColor: string }) {
+  return (
+    <>
+      <div className="flex">
+        <div className="w-2" style={{ backgroundColor: brandColor }}></div>
+        <div className="flex-1 p-6">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-4">
+              {invoice.logo && (
+                <img src={invoice.logo} alt="Logo" className="h-14 w-auto object-contain" />
+              )}
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">INVOICE</h1>
+                <p className="text-gray-500 mt-1">{invoice.invoiceNumber}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <StatusBadge status={invoice.status} variant="outlined" />
+              <div className="mt-2 text-sm text-gray-500">
+                <div>{format(new Date(invoice.createdAt), 'MMM d, yyyy')}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <InvoiceBody invoice={invoice} currencySymbol={currencySymbol} brandColor={brandColor} />
+    </>
+  )
+}
+
+// ========== MINIMAL TEMPLATE ==========
+function MinimalTemplate({ invoice, currencySymbol, brandColor }: { invoice: Invoice; currencySymbol: string; brandColor: string }) {
+  return (
+    <>
+      <div className="p-8 border-b border-gray-200">
+        <div className="flex justify-between items-start">
+          <div>
+            {invoice.logo && (
+              <img src={invoice.logo} alt="Logo" className="h-10 w-auto object-contain mb-4" />
+            )}
+            <h1 className="text-4xl font-light text-gray-900 tracking-tight">INVOICE</h1>
+            <p className="text-gray-400 mt-2 text-sm">{invoice.invoiceNumber}</p>
+          </div>
+          <div className="text-right">
+            <StatusBadge status={invoice.status} variant="minimal" />
+            <div className="mt-4 space-y-1 text-sm text-gray-500">
+              <div><span className="text-gray-400">Date:</span> {format(new Date(invoice.createdAt), 'MMM d, yyyy')}</div>
+              <div><span className="text-gray-400">Due:</span> {format(new Date(invoice.dueDate), 'MMM d, yyyy')}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <InvoiceBody invoice={invoice} currencySymbol={currencySymbol} brandColor={brandColor} minimal />
+    </>
+  )
+}
+
+// ========== CREATIVE TEMPLATE ==========
+function CreativeTemplate({ invoice, currencySymbol, brandColor }: { invoice: Invoice; currencySymbol: string; brandColor: string }) {
+  return (
+    <>
+      <div className="p-6 text-white" style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${brandColor}cc 100%)` }}>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            {invoice.logo && (
+              <div className="bg-white/20 rounded-xl p-2">
+                <img src={invoice.logo} alt="Logo" className="h-10 w-auto object-contain" />
+              </div>
+            )}
+            <div>
+              <h1 className="text-2xl font-bold tracking-wide">INVOICE</h1>
+              <p className="text-white/70 text-sm mt-1">{invoice.invoiceNumber}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <StatusBadge status={invoice.status} variant="creative" />
+          </div>
+        </div>
+      </div>
+      <div className="px-6 py-3 bg-gray-50 flex justify-between text-sm text-gray-600">
+        <span>Issued: {format(new Date(invoice.createdAt), 'MMM d, yyyy')}</span>
+        <span>Due: {format(new Date(invoice.dueDate), 'MMM d, yyyy')}</span>
+      </div>
+      <InvoiceBody invoice={invoice} currencySymbol={currencySymbol} brandColor={brandColor} />
+    </>
   )
 }
 

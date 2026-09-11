@@ -26,8 +26,6 @@ export default function AddressForm({ value, onChange, label = 'Address' }: Addr
   return (
     <div className="space-y-3">
       <label className="label">{label}</label>
-      
-      {/* Street */}
       <input
         type="text"
         className="input-field"
@@ -36,8 +34,6 @@ export default function AddressForm({ value, onChange, label = 'Address' }: Addr
         placeholder="Street address, P.O. box, company name"
         maxLength={200}
       />
-      
-      {/* City, State, Zip */}
       <div className="grid grid-cols-3 gap-3">
         <input
           type="text"
@@ -64,13 +60,7 @@ export default function AddressForm({ value, onChange, label = 'Address' }: Addr
           maxLength={20}
         />
       </div>
-      
-      {/* Country */}
-      <CountrySelect
-        value={value.countryCode}
-        onChange={handleCountryChange}
-        placeholder="Select country"
-      />
+      <CountrySelect value={value.countryCode} onChange={handleCountryChange} placeholder="Select country" />
     </div>
   )
 }

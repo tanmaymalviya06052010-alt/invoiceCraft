@@ -29,13 +29,13 @@ export default function ContactForm({ value, onChange, label, showTaxId = false 
   }
 
   return (
-    <div className="card">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">{label}</h2>
-      
+    <div className="card-elevated">
+      <h2 className="text-display-sm text-surface-900 mb-5">{label}</h2>
+
       <div className="space-y-4">
         {/* Name */}
         <div>
-          <label className="label">Name / Business *</label>
+          <label className="label">Name / Business</label>
           <input
             type="text"
             className="input-field"
@@ -75,24 +75,20 @@ export default function ContactForm({ value, onChange, label, showTaxId = false 
         {/* Tax ID */}
         {showTaxId && (
           <div>
-            <label className="label">Tax ID / VAT Number (optional)</label>
+            <label className="label">Tax ID / VAT Number</label>
             <input
               type="text"
-              className="input-field"
+              className="input-field font-mono"
               value={value.taxId || ''}
               onChange={(e) => updateField('taxId', e.target.value)}
-              placeholder="XX-XXXXXXX"
+              placeholder="Optional"
               maxLength={50}
             />
           </div>
         )}
 
         {/* Address */}
-        <AddressForm
-          value={value.address}
-          onChange={handleAddressChange}
-          label="Address"
-        />
+        <AddressForm value={value.address} onChange={handleAddressChange} label="Address" />
       </div>
     </div>
   )

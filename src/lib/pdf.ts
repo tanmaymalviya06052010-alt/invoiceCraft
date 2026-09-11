@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf'
-import { Invoice } from '@/types/invoice'
+import { Invoice, InvoiceTemplate } from '@/types/invoice'
 import { format } from 'date-fns'
 import { sanitizeString } from './validation'
 
@@ -34,9 +34,230 @@ const hexToRgb = (hex: string): [number, number, number] => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
   return result
     ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
-    : [59, 130, 246] // Default blue
+    : [59, 130, 246]
 }
 
+/**
+ * Generate PDF header based on template
+ */
+const generateHeader = (
+  doc: jsPDF, 
+  invoice: Invoice, 
+  pageWidth: number, 
+  margin: number, 
+  brandColor: [number, number, number],
+  template: InvoiceTemplate
+): void => {
+  const headerHeight = template === 'minimal' ? 50 : 45
+  
+  if (template === 'minimal') {
+    // Minimal - clean white header with thin border
+    doc.setDrawColor(200, 200, 200)
+    doc.line(margin, 45, pageWidth - margin, 45)
+  } else if (template === 'modern') {
+    // Modern - side accent bar
+    doc.setFillColor(...brandColor)
+    doc.rect(0, 0, 6, headerHeight, 'F')
+  } else if (template === 'creative') {
+    // Creative - gradient effect (simulated with two rectangles)
+    doc.setFillColor(...brandColor)
+    doc.rect(0, 0, pageWidth, headerHeight, 'F')
+    doc.setFillColor(brandColor[0], brandColor[1], brandColor[2])
+    doc.rect(0, headerHeight - 8, pageWidth, 8, 'F')
+  } else {
+    // Professional - full header
+    doc.setFillColor(...brandColor)
+    doc.rect(0, 0, pageWidth, headerHeight, 'F')
+  }
+  
+  // Logo
+  let titleX = margin
+  if (invoice.logo) {
+    try {
+      doc.addImage(invoice.logo, 'PNG', margin, 10, 35, 22)
+      titleX = margin + 40
+    } catch (error) {
+      console.warn('Failed to add logo to PDF:', error)
+    }
+  }
+  
+  // Invoice title
+  const titleY = template === 'minimal' ? 35 : 28
+  if (template === 'minimal') {
+    doc.setTextColor(30, 41, 59)
+    doc.setFontSize(32)
+  } else {
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(28)
+  }
+  doc.setFont('helvetica', 'bold')
+  doc.text('INVOICE', titleX, titleY)
+  
+  // Invoice number
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'normal')
+  if (template === 'minimal') {
+    doc.setTextColor(100, 116, 139)
+  } else {
+    doc.setTextColor(255, 255, 255)
+  }
+  doc.text(sanitizeForPDF(invoice.invoiceNumber), pageWidth - margin, titleY, { align: 'right' })
+}
+
+/**
+ * Generate PDF body items table
+ */
+const generateItemsTable = (
+  doc: jsPDF,
+  invoice: Invoice,
+  margin: number,
+  pageWidth: number,
+  contentWidth: number,
+  startY: number,
+  brandColor: [number, number, number],
+  template: InvoiceTemplate
+): number => {
+  const currencySymbol = invoice.currencySymbol || '$'
+  let y = startY
+  
+  // Table header
+  if (template === 'minimal') {
+    doc.setDrawColor(180, 180, 180)
+    doc.line(margin, y, pageWidth - margin, y)
+  } else {
+    doc.setFillColor(241, 245, 249)
+    doc.rect(margin, y, contentWidth, 8, 'F')
+  }
+  
+  doc.setTextColor(30, 41, 59)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.text('DESCRIPTION', margin + 2, y + 5.5)
+  doc.text('QTY', margin + 115, y + 5.5)
+  doc.text('RATE', margin + 135, y + 5.5)
+  doc.text('AMOUNT', pageWidth - margin - 2, y + 5.5, { align: 'right' })
+  
+  y += 10
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  
+  const maxItems = Math.min(invoice.items.length, 50)
+  
+  for (let index = 0; index < maxItems; index++) {
+    const item = invoice.items[index]
+    if (!item) continue
+    
+    // Alternating row background
+    if (template !== 'minimal' && index % 2 === 0) {
+      doc.setFillColor(248, 250, 252)
+      doc.rect(margin, y - 3, contentWidth, 8, 'F')
+    }
+    
+    // Row border
+    if (template === 'minimal') {
+      doc.setDrawColor(230, 230, 230)
+    } else {
+      doc.setDrawColor(226, 232, 240)
+    }
+    doc.line(margin, y + 5, pageWidth - margin, y + 5)
+    
+    doc.setTextColor(100, 116, 139)
+    
+    const descText = sanitizeForPDF(item.description) || '-'
+    const descLines = doc.splitTextToSize(descText, 90)
+    doc.text(descLines[0] || '-', margin + 2, y + 3)
+    
+    const qty = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
+    const rate = typeof item.rate === 'number' && !isNaN(item.rate) ? item.rate : 0
+    const amount = typeof item.amount === 'number' && !isNaN(item.amount) ? item.amount : 0
+    
+    doc.text(qty.toString(), margin + 118, y + 3)
+    doc.text(`${currencySymbol}${rate.toFixed(2)}`, margin + 135, y + 3)
+    doc.text(`${currencySymbol}${amount.toFixed(2)}`, pageWidth - margin - 2, y + 3, { align: 'right' })
+    
+    y += 8
+  }
+  
+  return y
+}
+
+/**
+ * Generate PDF totals section
+ */
+const generateTotals = (
+  doc: jsPDF,
+  invoice: Invoice,
+  margin: number,
+  pageWidth: number,
+  startY: number,
+  brandColor: [number, number, number],
+  template: InvoiceTemplate
+): number => {
+  const currencySymbol = invoice.currencySymbol || '$'
+  let y = startY + 8
+  
+  const subtotal = typeof invoice.subtotal === 'number' && !isNaN(invoice.subtotal) ? invoice.subtotal : 0
+  const taxAmount = typeof invoice.taxAmount === 'number' && !isNaN(invoice.taxAmount) ? invoice.taxAmount : 0
+  const total = typeof invoice.total === 'number' && !isNaN(invoice.total) ? invoice.total : 0
+  const taxRate = typeof invoice.taxRate === 'number' && !isNaN(invoice.taxRate) ? invoice.taxRate : 0
+  
+  // Divider
+  if (template === 'minimal') {
+    doc.setDrawColor(180, 180, 180)
+  } else {
+    doc.setDrawColor(226, 232, 240)
+  }
+  doc.line(pageWidth - margin - 65, y, pageWidth - margin, y)
+  
+  y += 8
+  doc.setFontSize(10)
+  doc.setTextColor(100, 116, 139)
+  doc.setFont('helvetica', 'normal')
+  
+  doc.text('Subtotal', pageWidth - margin - 65, y)
+  doc.text(`${currencySymbol}${subtotal.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' })
+  
+  if (taxRate > 0) {
+    y += 8
+    doc.text(`Tax (${taxRate}%)`, pageWidth - margin - 65, y)
+    doc.text(`${currencySymbol}${taxAmount.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' })
+  }
+  
+  y += 10
+  
+  if (template === 'creative') {
+    // Creative - rounded box
+    doc.setFillColor(...brandColor)
+    doc.roundedRect(pageWidth - margin - 68, y - 5, 70, 12, 3, 3, 'F')
+    doc.setTextColor(255, 255, 255)
+  } else if (template === 'modern') {
+    // Modern - bold bar
+    doc.setFillColor(...brandColor)
+    doc.rect(pageWidth - margin - 68, y - 5, 70, 12, 'F')
+    doc.setTextColor(255, 255, 255)
+  } else if (template === 'minimal') {
+    // Minimal - simple text
+    doc.setTextColor(30, 41, 59)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+  } else {
+    // Professional - rounded box
+    doc.setFillColor(...brandColor)
+    doc.roundedRect(pageWidth - margin - 68, y - 5, 70, 12, 2, 2, 'F')
+    doc.setTextColor(255, 255, 255)
+  }
+  
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.text('TOTAL', pageWidth - margin - 63, y + 3)
+  doc.text(`${currencySymbol}${total.toFixed(2)}`, pageWidth - margin - 5, y + 3, { align: 'right' })
+  
+  return y
+}
+
+/**
+ * Main PDF generation function
+ */
 export const generatePDF = (invoice: Invoice): jsPDF => {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -48,50 +269,21 @@ export const generatePDF = (invoice: Invoice): jsPDF => {
     throw new Error('Invalid invoice data')
   }
   
-  // Colors
   const brandColor = hexToRgb(invoice.brandColor || '#3b82f6')
   const darkColor: [number, number, number] = [30, 41, 59]
   const grayColor: [number, number, number] = [100, 116, 139]
-  const lightGray: [number, number, number] = [241, 245, 249]
+  const template = invoice.template || 'professional'
   
-  // Currency symbol
-  const currencySymbol = invoice.currencySymbol || '$'
+  // Generate header
+  generateHeader(doc, invoice, pageWidth, margin, brandColor, template)
   
-  // ========== HEADER ==========
-  doc.setFillColor(...brandColor)
-  doc.rect(0, 0, pageWidth, 45, 'F')
-  
-  // Logo (if provided)
-  let headerContentY = 30
-  if (invoice.logo) {
-    try {
-      // Add logo to PDF
-      doc.addImage(invoice.logo, 'PNG', margin, 10, 40, 25)
-      headerContentY = 30
-    } catch (error) {
-      // If logo fails to load, continue without it
-      console.warn('Failed to add logo to PDF:', error)
-    }
-  }
-  
-  // Invoice title
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(28)
-  doc.setFont('helvetica', 'bold')
-  doc.text('INVOICE', margin + (invoice.logo ? 45 : 0), headerContentY)
-  
-  // Invoice number
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'normal')
-  doc.text(sanitizeForPDF(invoice.invoiceNumber), pageWidth - margin, headerContentY, { align: 'right' })
-  
-  // ========== FROM / BILL TO / DATES ==========
-  let y = 60
+  // FROM / BILL TO / DATES section
+  let y = template === 'minimal' ? 60 : 58
   const leftCol = margin
   const midCol = 80
   const rightCol = 140
   
-  // FROM section
+  // FROM
   doc.setTextColor(...darkColor)
   doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
@@ -123,7 +315,7 @@ export const generatePDF = (invoice: Invoice): jsPDF => {
     doc.text(lines, leftCol, y)
   }
   
-  // BILL TO section
+  // BILL TO
   y = 60
   doc.setTextColor(...darkColor)
   doc.setFontSize(9)
@@ -152,7 +344,7 @@ export const generatePDF = (invoice: Invoice): jsPDF => {
     doc.text(lines, midCol, y)
   }
   
-  // DATES section (right column)
+  // DATES
   y = 60
   doc.setTextColor(...darkColor)
   doc.setFontSize(9)
@@ -193,118 +385,30 @@ export const generatePDF = (invoice: Invoice): jsPDF => {
     doc.text('-', rightCol, y)
   }
   
-  // ========== ITEMS TABLE ==========
-  y = 105
+  // Items table
+  const tableStartY = 105
+  const tableEndY = generateItemsTable(doc, invoice, margin, pageWidth, contentWidth, tableStartY, brandColor, template)
   
-  // Table header background
-  doc.setFillColor(...lightGray)
-  doc.rect(margin, y, contentWidth, 8, 'F')
+  // Totals
+  generateTotals(doc, invoice, margin, pageWidth, tableEndY, brandColor, template)
   
-  // Table header text
-  doc.setTextColor(...darkColor)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.text('DESCRIPTION', margin + 2, y + 5.5)
-  doc.text('QTY', margin + 115, y + 5.5)
-  doc.text('RATE', margin + 135, y + 5.5)
-  doc.text('AMOUNT', pageWidth - margin - 2, y + 5.5, { align: 'right' })
-  
-  // Table rows
-  y += 10
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  
-  const maxItems = Math.min(invoice.items.length, 50)
-  
-  for (let index = 0; index < maxItems; index++) {
-    const item = invoice.items[index]
-    if (!item) continue
-    
-    // Alternating row background
-    if (index % 2 === 0) {
-      doc.setFillColor(248, 250, 252)
-      doc.rect(margin, y - 3, contentWidth, 8, 'F')
-    }
-    
-    // Row border
-    doc.setDrawColor(226, 232, 240)
-    doc.line(margin, y + 5, pageWidth - margin, y + 5)
-    
-    doc.setTextColor(...grayColor)
-    
-    // Description
-    const descText = sanitizeForPDF(item.description) || '-'
-    const descLines = doc.splitTextToSize(descText, 90)
-    doc.text(descLines[0] || '-', margin + 2, y + 3)
-    
-    // Numbers
-    const qty = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
-    const rate = typeof item.rate === 'number' && !isNaN(item.rate) ? item.rate : 0
-    const amount = typeof item.amount === 'number' && !isNaN(item.amount) ? item.amount : 0
-    
-    doc.text(qty.toString(), margin + 118, y + 3)
-    doc.text(`${currencySymbol}${rate.toFixed(2)}`, margin + 135, y + 3)
-    doc.text(`${currencySymbol}${amount.toFixed(2)}`, pageWidth - margin - 2, y + 3, { align: 'right' })
-    
-    y += 8
-  }
-  
-  // ========== TOTALS ==========
-  y += 8
-  
-  // Divider line
-  doc.setDrawColor(226, 232, 240)
-  doc.line(pageWidth - margin - 65, y, pageWidth - margin, y)
-  
-  y += 8
-  doc.setFontSize(10)
-  
-  const subtotal = typeof invoice.subtotal === 'number' && !isNaN(invoice.subtotal) ? invoice.subtotal : 0
-  const taxAmount = typeof invoice.taxAmount === 'number' && !isNaN(invoice.taxAmount) ? invoice.taxAmount : 0
-  const total = typeof invoice.total === 'number' && !isNaN(invoice.total) ? invoice.total : 0
-  const taxRate = typeof invoice.taxRate === 'number' && !isNaN(invoice.taxRate) ? invoice.taxRate : 0
-  
-  // Subtotal
-  doc.setTextColor(...grayColor)
-  doc.setFont('helvetica', 'normal')
-  doc.text('Subtotal', pageWidth - margin - 65, y)
-  doc.text(`${currencySymbol}${subtotal.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' })
-  
-  // Tax (if applicable)
-  if (taxRate > 0) {
-    y += 8
-    doc.text(`Tax (${taxRate}%)`, pageWidth - margin - 65, y)
-    doc.text(`${currencySymbol}${taxAmount.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' })
-  }
-  
-  // Total box
-  y += 10
-  doc.setFillColor(...brandColor)
-  doc.roundedRect(pageWidth - margin - 68, y - 5, 70, 12, 2, 2, 'F')
-  
-  doc.setTextColor(255, 255, 255)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.text('TOTAL', pageWidth - margin - 63, y + 3)
-  doc.text(`${currencySymbol}${total.toFixed(2)}`, pageWidth - margin - 5, y + 3, { align: 'right' })
-  
-  // ========== NOTES ==========
+  // Notes
   if (invoice.notes && typeof invoice.notes === 'string' && invoice.notes.trim()) {
-    y += 25
+    let notesY = tableEndY + 50
     doc.setTextColor(...darkColor)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
-    doc.text('NOTES', margin, y)
+    doc.text('NOTES', margin, notesY)
     
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...grayColor)
     doc.setFontSize(10)
     const sanitizedNotes = sanitizeForPDF(invoice.notes).substring(0, 500)
     const noteLines = doc.splitTextToSize(sanitizedNotes, contentWidth)
-    doc.text(noteLines.slice(0, 5), margin, y + 8)
+    doc.text(noteLines.slice(0, 5), margin, notesY + 8)
   }
   
-  // ========== FOOTER ==========
+  // Footer
   doc.setTextColor(...grayColor)
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')

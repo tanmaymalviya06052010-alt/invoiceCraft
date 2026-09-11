@@ -43,11 +43,20 @@ export interface Invoice {
   // Currency
   currency?: string
   currencySymbol?: string
+  
+  // Template
+  template?: 'professional' | 'modern' | 'minimal' | 'creative'
 }
 
 export type InvoiceTemplate = 'professional' | 'modern' | 'minimal' | 'creative'
 
-// Supported currencies
+export const TEMPLATE_OPTIONS: { id: InvoiceTemplate; name: string; description: string }[] = [
+  { id: 'professional', name: 'Professional', description: 'Clean, classic design' },
+  { id: 'modern', name: 'Modern', description: 'Bold & contemporary' },
+  { id: 'minimal', name: 'Minimal', description: 'Simple & elegant' },
+  { id: 'creative', name: 'Creative', description: 'Colorful & unique' },
+]
+
 export const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'EUR', symbol: '€', name: 'Euro' },
@@ -71,7 +80,6 @@ export const CURRENCIES = [
   { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
 ]
 
-// Default invoice
 export const defaultInvoice: Omit<Invoice, 'id' | 'invoiceNumber'> = {
   status: 'draft',
   createdAt: new Date().toISOString(),
@@ -106,4 +114,5 @@ export const defaultInvoice: Omit<Invoice, 'id' | 'invoiceNumber'> = {
   brandColor: '#3b82f6',
   currency: 'USD',
   currencySymbol: '$',
+  template: 'professional',
 }

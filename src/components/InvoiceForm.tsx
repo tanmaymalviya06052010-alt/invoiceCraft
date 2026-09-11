@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { FiPlus, FiTrash2, FiDownload, FiSend, FiEye, FiSave, FiAlertCircle, FiUpload, FiX } from 'react-icons/fi'
-import { Invoice, InvoiceItem, defaultInvoice, CURRENCIES } from '@/types/invoice'
+import { Invoice, InvoiceItem, defaultInvoice, CURRENCIES, TEMPLATE_OPTIONS, InvoiceTemplate } from '@/types/invoice'
 import { saveInvoice, getInvoice } from '@/lib/storage'
 import { downloadPDF } from '@/lib/pdf'
 import { 
@@ -459,6 +459,27 @@ export default function InvoiceForm({ id }: InvoiceFormProps) {
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Template Selection */}
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Template</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {TEMPLATE_OPTIONS.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => setInvoice({ ...invoice, template: template.id })}
+                className={`p-3 rounded-lg border-2 text-left transition-all ${
+                  invoice.template === template.id
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-medium text-sm text-gray-900">{template.name}</div>
+                <div className="text-xs text-gray-500 mt-1">{template.description}</div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* From Section */}
